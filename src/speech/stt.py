@@ -1,11 +1,12 @@
 
-import os
 import azure.cognitiveservices.speech as speechsdk
+
+from src.config import settings
 
 
 def listen_once() -> str:
-    key = os.environ.get("SPEECH_KEY")
-    region = os.environ.get("SPEECH_REGION")
+    key = settings.speech_key
+    region = settings.speech_region
 
     if not key or not region:
         raise RuntimeError("Speech credentials are not configured.")
@@ -17,7 +18,7 @@ def listen_once() -> str:
 
     # Start with Telugu. Test English and mixed-language recognition
     # separately before choosing a production recognition strategy.
-    config.speech_recognition_language = "te-IN"
+    config.speech_recognition_language = settings.speech_recognition_language
 
     audio = speechsdk.audio.AudioConfig(use_default_microphone=True)
     recognizer = speechsdk.SpeechRecognizer(
