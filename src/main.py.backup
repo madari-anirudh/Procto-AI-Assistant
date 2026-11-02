@@ -1,0 +1,54 @@
+
+import time
+
+from src.speech.stt import listen_once
+from src.assistant.router import handle_command
+
+
+def main() -> None:
+    print("=" * 45)
+    print("       PROCTO VOICE ASSISTANT")
+    print("=" * 45)
+    print("Language: Telugu + English/Tenglish")
+    print("Mode: Continuous listening")
+    print("Say 'stop procto' to exit.")
+    print("Press Ctrl+C to stop at any time.")
+    print("Say 'please' to make a polite request.")
+    print("=" * 45)
+
+    print("Starting Procto...")
+    print("=" * 45)
+
+    running = True
+
+    try:
+        while running:
+            try:
+                # Listen for one utterance.
+                recognized_text = listen_once()
+
+                if not recognized_text.strip():
+                    time.sleep(0.5)
+                    continue
+
+                # Process the command and speak the response.
+                running = handle_command(recognized_text)
+
+                # Give the microphone a moment before listening again.
+                time.sleep(0.3)
+
+            except Exception as error:
+                # Keep the assistant alive after a recoverable error.
+                print(f"\nA voice operation failed: {error}")
+                print("Retrying in 2 seconds...")
+                time.sleep(2)
+
+    except KeyboardInterrupt:
+        print("\nStopping Procto...")
+
+    finally:
+        print("Procto has stopped.")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,333 @@
+
+import re
+import subprocess
+import webbrowser
+from datetime import datetime
+from urllib.parse import quote_plus
+
+from src.speech.tts import speak
+from src.assistant.windows_commands import handle_windows_command
+from src.assistant.telugu_aliases import normalize_telugu_aliases
+
+# ==========================================
+# APPROVED WEBSITES
+# ==========================================
+
+WEBSITES = {
+    "youtube": "https://www.youtube.com",
+    "google": "https://www.google.com",
+    "github": "https://github.com",
+    "gmail": "https://mail.google.com",
+    "chatgpt": "https://chatgpt.com",
+}
+
+
+# ==========================================
+# APPROVED WINDOWS APPLICATIONS
+# ==========================================
+
+APPS = {
+    "notepad": ["notepad.exe"],
+    "calculator": ["calc.exe"],
+    "paint": ["mspaint.exe"],
+    "file explorer": ["explorer.exe"],
+}
+
+
+# ==========================================
+# TELUGU + ENGLISH NORMALIZATION
+# ==========================================
+
+def normalize_command(text: str) -> str:
+    """Convert common Telugu-script commands to English."""
+
+    command = text.lower().strip()
+
+    # Longer phrases are processed before shorter phrases.
+    replacements = {
+        # Assistant name and polite words
+        "ప్రోక్టో": "procto",
+        "ఫోటో": "procto",
+        "ప్లీజ్": "please",
+        "హే": "hey",
+
+        # Actions
+        "ఓపెన్": "open",
+        "లాంచ్": "launch",
+        "స్టార్ట్": "start",
+        "సర్చ్ ఫర్": "search for",
+        "సెర్చ్ ఫర్": "search for",
+        "సర్చ్": "search",
+        "సెర్చ్": "search",
+        "వెతుకు": "search",
+        "స్టాప్": "stop",
+        "ఆపు": "stop",
+        "ఎగ్జిట్": "exit",
+        "క్విట్": "quit",
+
+        # Websites
+        "యూట్యూబ్": "youtube",
+        "గూగుల్": "google",
+        "జీమెయిల్": "gmail",
+        "గిట్ హబ్": "github",
+        "గిట్‌హబ్": "github",
+        "చాట్ జిపిటి": "chatgpt",
+
+        # Windows apps
+        "నోట్ప్యాడ్": "notepad",
+        "నోట్పాడ్": "notepad",
+        "నోట్‌ప్యాడ్": "notepad",
+        "నోట్ ప్యాడ్": "notepad",
+        "నోట్‌పాడ్": "notepad",
+        "నోట్ పాడ్": "notepad",
+        "క్యాలిక్యులేటర్": "calculator",
+        "కాలిక్యులేటర్": "calculator",
+        "క్యాలికులేటర్": "calculator",
+        "పెయింట్": "paint",
+        "ఫైల్ ఎక్స్‌ప్లోరర్": "file explorer",
+        "ఫైల్ ఎక్స్ప్లోరర్": "file explorer",
+        "ఫైల్ ఎక్స్‌ప్లోరర్": "file explorer",
+        "ఎక్స్‌ప్లోరర్": "explorer",
+
+        # Search terms
+        "ఫర్": "for",
+        "పైథాన్": "python",
+        "ట్యుటోరియల్స్": "tutorials",
+        "ట్యుటోరియల్": "tutorial",
+
+        # Time and date
+        "టైమ్": "time",
+        "సమయం": "time",
+        "డేట్": "date",
+        "ఈరోజు": "today",
+       
+        "సెట్టింగ్స్": "settings",
+        "సెట్టింగ్": "settings",
+        "టాస్క్ మేనేజర్": "task manager",
+        "టాస్క్ మేనేజర్": "task manager",
+        "కమాండ్ ప్రాంప్ట్": "command prompt",
+        "డౌన్లోడ్స్": "downloads",
+        "డాక్యుమెంట్స్": "documents",
+        "పిక్చర్స్": "pictures",
+        "బ్లూటూత్": "bluetooth",
+        "వైఫై": "wifi",
+        "వై ఫై": "wifi",
+        "స్క్రీన్ షాట్": "screenshot",
+        "స్క్రీన్‌షాట్": "screenshot",
+        "వాల్యూమ్": "volume",
+        "పెంచు": "up",
+        "తగ్గించు": "down",
+        "మ్యూట్": "mute",
+        "లాక్": "lock",
+    }
+
+    for original, replacement in sorted(
+        replacements.items(),
+        key=lambda item: len(item[0]),
+        reverse=True,
+    ):
+        command = command.replace(original, replacement)
+
+    # Normalize once after all phrase replacements.
+    command = re.sub(r"ప్రో\s*క్టో|ప్రో\s*టో|ప్రోటో", "procto", command)
+    command = re.sub(r"[^\w\s\u0C00-\u0C7F]", " ", command)
+    command = " ".join(command.split())
+
+    
+    print(f"Command after normalization: {command}")
+    return command
+
+
+# ==========================================
+# COMMAND ROUTER
+# ==========================================
+
+def handle_command(text: str) -> bool:
+    """
+    Process a recognized voice command.
+
+    Returns:
+        True  -> continue running Procto
+        False -> stop Procto
+    """
+
+    print(f"\nRecognized: {text}")
+
+    if not text or not text.strip():
+        return True
+
+    # Match complete Telugu phrases before translating individual words.
+    command = normalize_telugu_aliases(text)
+    print(f"Command after Telugu alias matching: {command}")
+    command = normalize_command(command)
+    print(f"Final normalized command: {command}")
+    words = command.split()
+
+    # --------------------------------------
+    # STOP PROCTO
+    # --------------------------------------
+
+    stop_commands = {
+        "stop",
+        "stop procto",
+        "exit",
+        "exit procto",
+        "quit",
+        "quit procto",
+        "goodbye procto",
+    }
+
+    if command in stop_commands:
+        speak("Okay, Procto is stopping.")
+        return False
+
+    # Remove assistant name and polite phrases.
+    command = re.sub(
+        r"\b(please|hey|procto|can you|could you)\b",
+        " ",
+        command,
+    )
+    command = " ".join(command.split())
+    words = command.split()
+
+    if not command:
+        return True
+    
+    # --------------------------------------
+    # ADDITIONAL APPROVED WINDOWS COMMANDS
+    # --------------------------------------
+
+    try:
+        if handle_windows_command(command):
+            speak("Okay, done.")
+            return True
+    except Exception as error:
+        print(f"Windows command error: {error}")
+        speak("Sorry, I could not complete that Windows action.")
+        return True
+
+    # --------------------------------------
+    # GREETINGS
+    # --------------------------------------
+
+    if any(word in words for word in ("hello", "hi")):
+        speak("Hello! Namaskaram. How can I help you?")
+        return True
+
+    # --------------------------------------
+    # TIME
+    # --------------------------------------
+
+    if "time" in words:
+        current_time = datetime.now().strftime("%I:%M %p")
+        speak(f"The time is {current_time}.")
+        return True
+
+    # --------------------------------------
+    # DATE
+    # --------------------------------------
+
+    if "date" in words or "today" in words:
+        current_date = datetime.now().strftime(
+            "%A, %d %B %Y"
+        )
+        speak(f"Today is {current_date}.")
+        return True
+
+    # --------------------------------------
+    # OPEN WEBSITES
+    # --------------------------------------
+
+    for name, url in WEBSITES.items():
+        if (
+            command == name
+            or re.search(
+                rf"\b(open|launch|visit|go to)\s+"
+                rf"{re.escape(name)}\b",
+                command,
+            )
+        ):
+            try:
+                webbrowser.open(url)
+                speak(f"Opening {name}.")
+            except Exception as error:
+                print(f"Website error: {error}")
+                speak(f"I could not open {name}.")
+
+            return True
+
+    # --------------------------------------
+    # OPEN WINDOWS APPLICATIONS
+    # --------------------------------------
+
+    app_aliases = {
+        "notepad": ("notepad", "note pad"),
+        "calculator": ("calculator", "calc"),
+        "paint": ("paint",),
+        "file explorer": (
+            "file explorer",
+            "explorer",
+        ),
+    }
+
+    for app_name, aliases in app_aliases.items():
+        for alias in aliases:
+            pattern = (
+                rf"\b(open|launch|start)\s+"
+                rf"{re.escape(alias)}\b"
+            )
+
+            if re.search(pattern, command):
+                try:
+                    subprocess.Popen(
+                        APPS[app_name],
+                        shell=False,
+                    )
+                    speak(f"Opening {app_name}.")
+                except OSError as error:
+                    print(
+                        f"Could not open {app_name}: {error}"
+                    )
+                    speak(f"I could not open {app_name}.")
+
+                return True
+
+    # --------------------------------------
+    # GOOGLE SEARCH
+    # --------------------------------------
+
+    match = re.match(
+        r"^(?:search(?:\s+for)?|google)\s+(.+)$",
+        command,
+    )
+
+    if match:
+        query = match.group(1).strip()
+
+        if query:
+            search_url = (
+                "https://www.google.com/search?q="
+                + quote_plus(query)
+            )
+
+            try:
+                webbrowser.open(search_url)
+                speak(f"Searching Google for {query}.")
+            except Exception as error:
+                print(f"Search error: {error}")
+                speak("I could not perform that search.")
+
+            return True
+
+    # --------------------------------------
+    # UNKNOWN COMMAND
+    # --------------------------------------
+
+    print(f"No approved action matched: {command}")
+
+    speak(
+        "Sorry, I could not understand that command. "
+        "Please try again."
+    )
+
+    return True
