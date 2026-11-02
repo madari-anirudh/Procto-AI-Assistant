@@ -33,6 +33,21 @@ RUN
 Keep SPEECH_KEY and SPEECH_REGION configured in the same PowerShell
 session before launching, as in your existing backend setup.
 
+ENVIRONMENT CONFIGURATION
+-------------------------
+Copy `.env.example` to `.env` and set `SPEECH_KEY` and `SPEECH_REGION`.
+The application reads configuration from the process environment; `.env` is
+ignored by Git and is not loaded automatically. In PowerShell, load it or set
+the variables before launching, for example:
+
+    $env:SPEECH_KEY = "your-key"
+    $env:SPEECH_REGION = "your-region"
+
+Optional settings include `PROCTO_AUDIO_DEVICE`, `PROCTO_WAKE_WORD_MODEL`,
+`PROCTO_WAKE_WORD_THRESHOLD`, `PROCTO_SPEECH_RECOGNITION_LANGUAGE`, and
+`PROCTO_SPEECH_SYNTHESIS_VOICE`. See `.env.example` for all supported values.
+Leave `PROCTO_AUDIO_DEVICE` empty to use the system default microphone.
+
 IMPORTANT INTEGRATION NOTES
 ---------------------------
 1. The GUI imports these existing backend interfaces:

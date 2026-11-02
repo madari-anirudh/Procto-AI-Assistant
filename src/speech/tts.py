@@ -1,11 +1,12 @@
 
-import os
 import azure.cognitiveservices.speech as speechsdk
+
+from src.config import settings
 
 
 def speak(text: str) -> None:
-    key = os.environ.get("SPEECH_KEY")
-    region = os.environ.get("SPEECH_REGION")
+    key = settings.speech_key
+    region = settings.speech_region
 
     if not key or not region:
         raise RuntimeError(
@@ -16,7 +17,7 @@ def speak(text: str) -> None:
         subscription=key,
         region=region,
     )
-    config.speech_synthesis_voice_name = "te-IN-ShrutiNeural"
+    config.speech_synthesis_voice_name = settings.speech_synthesis_voice
 
     synthesizer = speechsdk.SpeechSynthesizer(
         speech_config=config

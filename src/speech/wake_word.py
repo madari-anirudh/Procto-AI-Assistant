@@ -5,11 +5,7 @@ import numpy as np
 import sounddevice as sd
 from openwakeword.model import Model
 
-
-MODEL_PATH = (
-    r".\.venv\Lib\site-packages\openwakeword"
-    r"\resources\models\hey_jarvis_v0.1.onnx"
-)
+from src.config import settings
 
 # Keep only a small buffer of audio chunks.
 audio_queue = queue.Queue(maxsize=8)
@@ -24,7 +20,7 @@ def get_wake_word_model():
     if _model is None:
         print("Loading wake-word detector for the first time...")
         _model = Model(
-            wakeword_models=[MODEL_PATH],
+            wakeword_models=[str(settings.wake_word_model_path)],
             inference_framework="onnx",
         )
 
@@ -64,18 +60,18 @@ def wait_for_wake_word():
     chunk_count = 0
 
     with sd.InputStream(
-        device=1,
-        samplerate=16000,
+        device=settings.audio_device,
+        samplerate=settings.audio_sample_rate,
         channels=1,
         dtype="int16",
-        blocksize=1280,
+        blocksize=settings.audio_block_size,
         callback=audio_callback,
     ):
         while True:
             audio = audio_queue.get()
             audio = np.asarray(audio).reshape(-1).astype(np.int16)
 
-            if audio.size != 1280:
+            if audio.size != settings.audio_block_size:
                 print(f"Unexpected audio chunk size: {audio.size}")
                 continue
 
@@ -91,7 +87,7 @@ def wait_for_wake_word():
                 )
                 print(f"Mic level: {rms:.0f} | Score: {score:.4f}")
 
-            if score > 0.15:
+            if score > settings.wake_word_threshold:
                 print(
                     f"\nWake word detected: "
                     f"hey_jarvis_v0.1 ({score:.2f})"
